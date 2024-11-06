@@ -190,26 +190,30 @@ class Ui_MainWindow(object):
 
             _, binary_mask = cv2.threshold(gray_image, threshold_value, 255, cv2.THRESH_BINARY_INV)
 
-            # flood fill mask to refine foreground
-            flood_filled = binary_mask.copy()
-            h, w = binary_mask.shape[:2]
-            mask = np.zeros((h + 2, w + 2), np.uint8)
-            cv2.floodFill(flood_filled, mask, (0, 0), 255)
-            flood_filled_inv = cv2.bitwise_not(flood_filled) # or ~flood_filled
+            # find contours to isolate the subject
+            contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            # create a mask that covers the subject
+            mask = np.zeros_like(gray_image)
+            cv2.drawContours(mask, contours, -1, (255), thickness=cv2.FILLED)
+
+            # create an inverse mask to keep the subject content intact
+            mask_inv = cv2.bitwise_not(mask)
 
             # extracting the subject
-            foreground = cv2.bitwise_and(self.input_image, self.input_image, mask=flood_filled_inv)
+            foreground = cv2.bitwise_and(self.input_image, self.input_image, mask=mask)
 
             # check if background is an image or color
+            h, w = mask.shape[:2]
             if self.background_image is not None:
                 background_resized = cv2.resize(self.background_image, (w, h))
-                background = cv2.bitwise_and(background_resized, background_resized, mask=flood_filled)
+                background = cv2.bitwise_and(background_resized, background_resized, mask=mask_inv)
                 requires_rgb_conversion = False
                 self.selected_color = None
             elif self.selected_color is not None:
                 b, g, r = self.selected_color.blue(), self.selected_color.green(), self.selected_color.red()
                 color_img = np.full((h, w, 3), (b, g, r), dtype=np.uint8)
-                background = cv2.bitwise_and(color_img, color_img, mask=flood_filled)
+                background = cv2.bitwise_and(color_img, color_img, mask=mask_inv)
                 requires_rgb_conversion = True
                 self.background_image = None
             else:
