@@ -28,6 +28,7 @@ class ImageLabel(QtWidgets.QLabel):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.selectingROI = False
+            self.roi = self.roi.normalized()
             self.update()
 
     def paintEvent(self, event):
